@@ -24,13 +24,35 @@ Variables
 | `dns_zone_id`      | `string` | `null`  | Route53 zone ID to register the service in                                 |
 | `dns_subdomain`    | `string` | `null`  | Subdomain to register service as (required if `dns_zone_id`)               |
 
+`load_balancers[].dns_zone` is optional. When it's set, the module looks up that Route 53 zone and
+creates an alias record for `dns_subdomain`. When it isn't, no DNS lookup or record is made, and
+only the listener rule's host-header match (`<dns_subdomain>.*`) is created.
+
+### IAM
+
+| Variable                  | Type           | Default | Description                                                                          |
+|---------------------------|----------------|---------|--------------------------------------------------------------------------------------|
+| `role_arn`                | `string`       | `null`  | Existing role for the service's tasks to run as                                      |
+| `role_policy`             | `string`       | `null`  | IAM policy document for a task role created by the module                            |
+| `role_policy_arns`        | `list(string)` | `[]`    | Managed policy ARNs attached to the task role created by the module                  |
+| `containers[].secret_arns`| `list(string)` | `[]`    | Secrets the container reads (the container definition module's `secret_arns` output) |
+
+A task role named `<name>` under the path `/service/` is created when `role_policy` or
+`role_policy_arns` is set.
+
+When any container has `secret_arns`, the module also creates an execution role,
+`<name>-execution` under `/service/`, with `AmazonECSTaskExecutionRolePolicy` and
+`secretsmanager:GetSecretValue` on exactly those secrets, and sets it as the task definition's
+`execution_role_arn`.
+
 ### Deployment
 
 All services are configured to spread evenly across AZs and hosts
 
-| Variable            | Type   | Default | Description                                                                      |
-|---------------------|--------|---------|----------------------------------------------------------------------------------|
-| `distinct_instance` | `bool` | `false` | If set to true, will prevent multiple containers being deployed on the same host |
+| Variable                     | Type           | Default | Description                                                                      |
+|------------------------------|----------------|---------|----------------------------------------------------------------------------------|
+| `distinct_instance`          | `bool`         | `false` | If set to true, will prevent multiple containers being deployed on the same host |
+| `capacity_provider_strategy` | `list(object)` | `null`  | `{ capacity_provider, weight = 1, base = 0 }` entries. When set, replaces the `EC2` launch type; an empty list uses the cluster's default strategy |
 
 ### Scaling
 
@@ -100,3 +122,14 @@ module my_service {
 }
 ```
 
+Outputs
+-------
+
+| Output                | Description                                                        |
+|-----------------------|--------------------------------------------------------------------|
+| `service_name`        | ECS service name                                                   |
+| `task_definition_arn` | Task definition ARN                                                |
+| `task_role_arn`       | Task role created by the module, or `null`                         |
+| `execution_role_arn`  | Execution role created for the containers' secrets, or `null`      |
+| `target_groups`       | `{ arn, arn_suffix }` for each target group                        |
+| `scaling_target`      | Autoscaling target, when `target_scaling` or `custom_scaling` is set |

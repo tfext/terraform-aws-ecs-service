@@ -19,3 +19,11 @@ output "task_role_arn" {
 output "scaling_target" {
   value = try(aws_appautoscaling_target.service.0, null)
 }
+
+output "service_name" {
+  value = aws_ecs_service.service.name
+}
+
+output "execution_role_arn" {
+  value = try(aws_iam_role.execution[0].arn, null)
+}

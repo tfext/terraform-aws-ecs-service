@@ -14,7 +14,7 @@ variable "load_balancers" {
   type = list(object({
     name          = string
     short_name    = optional(string)
-    dns_zone      = string
+    dns_zone      = optional(string)
     dns_subdomain = string
     priority      = optional(number)
     vpc           = string
@@ -26,7 +26,7 @@ variable "load_balancers" {
   List of load balancers to attach the service to
   - name:           Name of AWS load balancer
   - short_name:     Short name to use for target group names (< 10 chars)
-  - dns_zone:       Route53 zone name to register in
+  - dns_zone:       Optional Route53 zone name to register in. If unset, no DNS record is created (the listener rule still matches dns_subdomain)
   - dns_subdomain:  Route53 subdomain to register as
   - priority:       Override default priority of generated listener rule
   - vpc:            Name of vpc
@@ -39,6 +39,7 @@ variable "containers" {
     container_name = string
     definition     = any
     service_type   = string
+    secret_arns    = optional(list(string), [])
     shared_data = optional(object({
       volume          = string
       efs_id          = string
@@ -70,6 +71,23 @@ variable "role_policy" {
   type        = string
   default     = null
   description = "IAM policy for service to run as"
+}
+
+variable "role_policy_arns" {
+  type        = list(string)
+  nullable    = false
+  default     = []
+  description = "Managed IAM policy ARNs to attach to the service's task role"
+}
+
+variable "capacity_provider_strategy" {
+  type = list(object({
+    capacity_provider = string
+    weight            = optional(number, 1)
+    base              = optional(number, 0)
+  }))
+  default     = null
+  description = "Capacity provider strategy. Replaces the EC2 launch type when set; an empty list uses the cluster's default strategy"
 }
 
 variable "health_check" {

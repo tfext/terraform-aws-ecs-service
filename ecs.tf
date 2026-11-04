@@ -8,7 +8,13 @@ resource "aws_ecs_task_definition" "service" {
   family                = var.name
   container_definitions = jsonencode(local.container_definitions)
   task_role_arn         = local.role_arn
-  depends_on            = [aws_iam_role_policy_attachment.service]
+  execution_role_arn    = try(aws_iam_role.execution[0].arn, null)
+  depends_on = [
+    aws_iam_role_policy_attachment.service,
+    aws_iam_role_policy_attachment.service_managed,
+    aws_iam_role_policy_attachment.execution,
+    aws_iam_role_policy.execution_secrets,
+  ]
 
   dynamic "volume" {
     for_each = { for def in var.containers : def.shared_data.volume => def.shared_data if def.shared_data != null }
@@ -34,9 +40,18 @@ resource "aws_ecs_service" "service" {
   deployment_minimum_healthy_percent = local.min_healthy
   deployment_maximum_percent         = local.max_healthy
   cluster                            = data.aws_ecs_cluster.cluster.id
-  launch_type                        = "EC2"
+  launch_type                        = var.capacity_provider_strategy == null ? "EC2" : null
   wait_for_steady_state              = var.wait_for_stable
   propagate_tags                     = "SERVICE"
+
+  dynamic "capacity_provider_strategy" {
+    for_each = coalesce(var.capacity_provider_strategy, [])
+    content {
+      capacity_provider = capacity_provider_strategy.value.capacity_provider
+      weight            = capacity_provider_strategy.value.weight
+      base              = capacity_provider_strategy.value.base
+    }
+  }
 
   dynamic "load_balancer" {
     for_each = local.lb_ports
