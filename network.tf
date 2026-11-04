@@ -5,6 +5,7 @@ locals {
   is_nlb              = local.lb_enabled && !local.is_alb
   target_group_prefix = coalesce(var.target_group_prefix, var.name)
   lbs                 = { for lb in var.load_balancers : lb.name => lb }
+  dns_lbs             = { for name, lb in local.lbs : name => lb if lb.dns_zone != null }
 
   default_health_check = {
     enabled      = true
@@ -66,7 +67,7 @@ data "aws_lb_listener" "listener" {
 }
 
 data "aws_route53_zone" "dns_zone" {
-  for_each = local.lbs
+  for_each = local.dns_lbs
   name     = each.value.dns_zone
 }
 
@@ -157,7 +158,7 @@ resource "aws_lb_listener" "tcp_target" {
 }
 
 resource "aws_route53_record" "service" {
-  for_each = local.lbs
+  for_each = local.dns_lbs
   zone_id  = data.aws_route53_zone.dns_zone[each.key].zone_id
   name     = each.value.dns_subdomain
   type     = "A"
